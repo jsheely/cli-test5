@@ -1,0 +1,1 @@
+FROM decentology/decentology-box:latest
