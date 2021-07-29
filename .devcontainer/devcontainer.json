@@ -12,8 +12,6 @@
 
 	// Set *default* container specific settings.json values on container create.
 	"settings": {},
-	"workspaceFolder": "/app",
-	"workspaceMount": "/app",
 	"runArgs": [
 		"--cap-add=SYS_PTRACE",
 		"--security-opt",
