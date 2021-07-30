@@ -12,12 +12,6 @@
 
 	// Set *default* container specific settings.json values on container create.
 	"settings": {},
-	"runArgs": [
-		"--cap-add=SYS_PTRACE",
-		"--security-opt",
-		"seccomp=unconfined",
-		"--privileged" // Resolves /tmp permission issue
-	],
 	// Add the IDs of extensions you want installed when the container is created.
 	"extensions": [
 		"dbaeumer.vscode-eslint"
@@ -25,10 +19,9 @@
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [5000, 5001, 5002, 8080, 8899, 8900, 12537],
-
+	"postAttachCommand": "sudo chown dappstarter:users /tmp",
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo chown dappstarter:users /tmp && yarn install",
+	"postCreateCommand": "yarn install",
 
 	// Comment out connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
-	"remoteUser": "dappstarter"
 }
