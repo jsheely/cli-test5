@@ -119,143 +119,6 @@ module.exports = class DappTransactions {
 		`;
 	}
 
-	static kittyitemsmarket_remove_market_item() {
-		return fcl.transaction`
-				import KittyItemsMarket from 0x01cf0e2f2f715450
-				
-				transaction(itemID: UInt64) {
-				    let marketCollection: &KittyItemsMarket.Collection
-				
-				    prepare(signer: AuthAccount) {
-				        self.marketCollection = signer.borrow<&KittyItemsMarket.Collection>(from: KittyItemsMarket.CollectionStoragePath)
-				            ?? panic("Missing or mis-typed KittyItemsMarket Collection")
-				    }
-				
-				    execute {
-				        let offer <-self.marketCollection.remove(itemID: itemID)
-				        destroy offer
-				    }
-				}
-				
-		`;
-	}
-
-	static kittyitemsmarket_buy_market_item() {
-		return fcl.transaction`
-				import Kibble from 0x01cf0e2f2f715450
-				import KittyItems from 0x01cf0e2f2f715450
-				import FungibleToken from 0xee82856bf20e2aa6
-				import NonFungibleToken from 0x01cf0e2f2f715450
-				import KittyItemsMarket from 0x01cf0e2f2f715450
-				
-				transaction(itemID: UInt64, marketCollectionAddress: Address) {
-				    let paymentVault: @FungibleToken.Vault
-				    let kittyItemsCollection: &KittyItems.Collection{NonFungibleToken.Receiver}
-				    let marketCollection: &KittyItemsMarket.Collection{KittyItemsMarket.CollectionPublic}
-				
-				    prepare(signer: AuthAccount) {
-				        self.marketCollection = getAccount(marketCollectionAddress)
-				            .getCapability<&KittyItemsMarket.Collection{KittyItemsMarket.CollectionPublic}>(
-				                KittyItemsMarket.CollectionPublicPath
-				            )!
-				            .borrow()
-				            ?? panic("Could not borrow market collection from market address")
-				
-				        let saleItem = self.marketCollection.borrowSaleItem(itemID: itemID)
-				                    ?? panic("No item with that ID")
-				        let price = saleItem.price
-				
-				        let mainKibbleVault = signer.borrow<&Kibble.Vault>(from: Kibble.VaultStoragePath)
-				            ?? panic("Cannot borrow Kibble vault from acct storage")
-				        self.paymentVault <- mainKibbleVault.withdraw(amount: price)
-				
-				        self.kittyItemsCollection = signer.borrow<&KittyItems.Collection{NonFungibleToken.Receiver}>(
-				            from: KittyItems.CollectionStoragePath
-				        ) ?? panic("Cannot borrow KittyItems collection receiver from acct")
-				    }
-				
-				    execute {
-				        self.marketCollection.purchase(
-				            itemID: itemID,
-				            buyerCollection: self.kittyItemsCollection,
-				            buyerPayment: <- self.paymentVault
-				        )
-				    }
-				}
-		`;
-	}
-
-	static kittyitemsmarket_sell_market_item() {
-		return fcl.transaction`
-				import Kibble from 0x01cf0e2f2f715450
-				import KittyItems from 0x01cf0e2f2f715450
-				import FungibleToken from 0xee82856bf20e2aa6
-				import NonFungibleToken from 0x01cf0e2f2f715450
-				import KittyItemsMarket from 0x01cf0e2f2f715450
-				
-				transaction(itemID: UInt64, price: UFix64) {
-				    let kibbleVault: Capability<&Kibble.Vault{FungibleToken.Receiver}>
-				    let kittyItemsCollection: Capability<&KittyItems.Collection{NonFungibleToken.Provider, KittyItems.KittyItemsCollectionPublic}>
-				    let marketCollection: &KittyItemsMarket.Collection
-				
-				    prepare(signer: AuthAccount) {
-				        // we need a provider capability, but one is not provided by default so we create one.
-				        let KittyItemsCollectionProviderPrivatePath = /private/kittyItemsCollectionProvider
-				
-				        self.kibbleVault = signer.getCapability<&Kibble.Vault{FungibleToken.Receiver}>(Kibble.ReceiverPublicPath)!
-				        assert(self.kibbleVault.borrow() != nil, message: "Missing or mis-typed Kibble receiver")
-				
-				        if !signer.getCapability<&KittyItems.Collection{NonFungibleToken.Provider, KittyItems.KittyItemsCollectionPublic}>(KittyItemsCollectionProviderPrivatePath)!.check() {
-				            signer.link<&KittyItems.Collection{NonFungibleToken.Provider, KittyItems.KittyItemsCollectionPublic}>(KittyItemsCollectionProviderPrivatePath, target: KittyItems.CollectionStoragePath)
-				        }
-				
-				        self.kittyItemsCollection = signer.getCapability<&KittyItems.Collection{NonFungibleToken.Provider, KittyItems.KittyItemsCollectionPublic}>(KittyItemsCollectionProviderPrivatePath)!
-				        assert(self.kittyItemsCollection.borrow() != nil, message: "Missing or mis-typed KittyItemsCollection provider")
-				
-				        self.marketCollection = signer.borrow<&KittyItemsMarket.Collection>(from: KittyItemsMarket.CollectionStoragePath)
-				            ?? panic("Missing or mis-typed KittyItemsMarket Collection")
-				    }
-				
-				    execute {
-				        let offer <- KittyItemsMarket.createSaleOffer (
-				            sellerItemProvider: self.kittyItemsCollection,
-				            itemID: itemID,
-				            typeID: self.kittyItemsCollection.borrow()!.borrowKittyItem(id: itemID)!.typeID,
-				            sellerPaymentReceiver: self.kibbleVault,
-				            price: price
-				        )
-				        self.marketCollection.insert(offer: <-offer)
-				    }
-				}
-		`;
-	}
-
-	static kittyitemsmarket_setup_account() {
-		return fcl.transaction`
-				import KittyItemsMarket from 0x01cf0e2f2f715450
-				
-				// This transaction configures an account to hold SaleOffer items.
-				
-				transaction {
-				    prepare(signer: AuthAccount) {
-				
-				        // if the account doesn't already have a collection
-				        if signer.borrow<&KittyItemsMarket.Collection>(from: KittyItemsMarket.CollectionStoragePath) == nil {
-				
-				            // create a new empty collection
-				            let collection <- KittyItemsMarket.createEmptyCollection() as! @KittyItemsMarket.Collection
-				            
-				            // save it to the account
-				            signer.save(<-collection, to: KittyItemsMarket.CollectionStoragePath)
-				
-				            // create a public capability for the collection
-				            signer.link<&KittyItemsMarket.Collection{KittyItemsMarket.CollectionPublic}>(KittyItemsMarket.CollectionPublicPath, target: KittyItemsMarket.CollectionStoragePath)
-				        }
-				    }
-				}
-		`;
-	}
-
 	static kittyitems_mint_kitty_item() {
 		return fcl.transaction`
 				import NonFungibleToken from 0x01cf0e2f2f715450
@@ -346,6 +209,143 @@ module.exports = class DappTransactions {
 				
 				        // Deposit the NFT in the recipient's collection
 				        depositRef.deposit(token: <-nft)
+				    }
+				}
+		`;
+	}
+
+	static kittyitemsmarket_buy_market_item() {
+		return fcl.transaction`
+				import Kibble from 0x01cf0e2f2f715450
+				import KittyItems from 0x01cf0e2f2f715450
+				import FungibleToken from 0xee82856bf20e2aa6
+				import NonFungibleToken from 0x01cf0e2f2f715450
+				import KittyItemsMarket from 0x01cf0e2f2f715450
+				
+				transaction(itemID: UInt64, marketCollectionAddress: Address) {
+				    let paymentVault: @FungibleToken.Vault
+				    let kittyItemsCollection: &KittyItems.Collection{NonFungibleToken.Receiver}
+				    let marketCollection: &KittyItemsMarket.Collection{KittyItemsMarket.CollectionPublic}
+				
+				    prepare(signer: AuthAccount) {
+				        self.marketCollection = getAccount(marketCollectionAddress)
+				            .getCapability<&KittyItemsMarket.Collection{KittyItemsMarket.CollectionPublic}>(
+				                KittyItemsMarket.CollectionPublicPath
+				            )!
+				            .borrow()
+				            ?? panic("Could not borrow market collection from market address")
+				
+				        let saleItem = self.marketCollection.borrowSaleItem(itemID: itemID)
+				                    ?? panic("No item with that ID")
+				        let price = saleItem.price
+				
+				        let mainKibbleVault = signer.borrow<&Kibble.Vault>(from: Kibble.VaultStoragePath)
+				            ?? panic("Cannot borrow Kibble vault from acct storage")
+				        self.paymentVault <- mainKibbleVault.withdraw(amount: price)
+				
+				        self.kittyItemsCollection = signer.borrow<&KittyItems.Collection{NonFungibleToken.Receiver}>(
+				            from: KittyItems.CollectionStoragePath
+				        ) ?? panic("Cannot borrow KittyItems collection receiver from acct")
+				    }
+				
+				    execute {
+				        self.marketCollection.purchase(
+				            itemID: itemID,
+				            buyerCollection: self.kittyItemsCollection,
+				            buyerPayment: <- self.paymentVault
+				        )
+				    }
+				}
+		`;
+	}
+
+	static kittyitemsmarket_remove_market_item() {
+		return fcl.transaction`
+				import KittyItemsMarket from 0x01cf0e2f2f715450
+				
+				transaction(itemID: UInt64) {
+				    let marketCollection: &KittyItemsMarket.Collection
+				
+				    prepare(signer: AuthAccount) {
+				        self.marketCollection = signer.borrow<&KittyItemsMarket.Collection>(from: KittyItemsMarket.CollectionStoragePath)
+				            ?? panic("Missing or mis-typed KittyItemsMarket Collection")
+				    }
+				
+				    execute {
+				        let offer <-self.marketCollection.remove(itemID: itemID)
+				        destroy offer
+				    }
+				}
+				
+		`;
+	}
+
+	static kittyitemsmarket_sell_market_item() {
+		return fcl.transaction`
+				import Kibble from 0x01cf0e2f2f715450
+				import KittyItems from 0x01cf0e2f2f715450
+				import FungibleToken from 0xee82856bf20e2aa6
+				import NonFungibleToken from 0x01cf0e2f2f715450
+				import KittyItemsMarket from 0x01cf0e2f2f715450
+				
+				transaction(itemID: UInt64, price: UFix64) {
+				    let kibbleVault: Capability<&Kibble.Vault{FungibleToken.Receiver}>
+				    let kittyItemsCollection: Capability<&KittyItems.Collection{NonFungibleToken.Provider, KittyItems.KittyItemsCollectionPublic}>
+				    let marketCollection: &KittyItemsMarket.Collection
+				
+				    prepare(signer: AuthAccount) {
+				        // we need a provider capability, but one is not provided by default so we create one.
+				        let KittyItemsCollectionProviderPrivatePath = /private/kittyItemsCollectionProvider
+				
+				        self.kibbleVault = signer.getCapability<&Kibble.Vault{FungibleToken.Receiver}>(Kibble.ReceiverPublicPath)!
+				        assert(self.kibbleVault.borrow() != nil, message: "Missing or mis-typed Kibble receiver")
+				
+				        if !signer.getCapability<&KittyItems.Collection{NonFungibleToken.Provider, KittyItems.KittyItemsCollectionPublic}>(KittyItemsCollectionProviderPrivatePath)!.check() {
+				            signer.link<&KittyItems.Collection{NonFungibleToken.Provider, KittyItems.KittyItemsCollectionPublic}>(KittyItemsCollectionProviderPrivatePath, target: KittyItems.CollectionStoragePath)
+				        }
+				
+				        self.kittyItemsCollection = signer.getCapability<&KittyItems.Collection{NonFungibleToken.Provider, KittyItems.KittyItemsCollectionPublic}>(KittyItemsCollectionProviderPrivatePath)!
+				        assert(self.kittyItemsCollection.borrow() != nil, message: "Missing or mis-typed KittyItemsCollection provider")
+				
+				        self.marketCollection = signer.borrow<&KittyItemsMarket.Collection>(from: KittyItemsMarket.CollectionStoragePath)
+				            ?? panic("Missing or mis-typed KittyItemsMarket Collection")
+				    }
+				
+				    execute {
+				        let offer <- KittyItemsMarket.createSaleOffer (
+				            sellerItemProvider: self.kittyItemsCollection,
+				            itemID: itemID,
+				            typeID: self.kittyItemsCollection.borrow()!.borrowKittyItem(id: itemID)!.typeID,
+				            sellerPaymentReceiver: self.kibbleVault,
+				            price: price
+				        )
+				        self.marketCollection.insert(offer: <-offer)
+				    }
+				}
+		`;
+	}
+
+	static kittyitemsmarket_setup_account() {
+		return fcl.transaction`
+				import KittyItemsMarket from 0x01cf0e2f2f715450
+				
+				// This transaction configures an account to hold SaleOffer items.
+				
+				transaction {
+				    prepare(signer: AuthAccount) {
+				
+				        // if the account doesn't already have a collection
+				        if signer.borrow<&KittyItemsMarket.Collection>(from: KittyItemsMarket.CollectionStoragePath) == nil {
+				
+				            // create a new empty collection
+				            let collection <- KittyItemsMarket.createEmptyCollection() as! @KittyItemsMarket.Collection
+				            
+				            // save it to the account
+				            signer.save(<-collection, to: KittyItemsMarket.CollectionStoragePath)
+				
+				            // create a public capability for the collection
+				            signer.link<&KittyItemsMarket.Collection{KittyItemsMarket.CollectionPublic}>(KittyItemsMarket.CollectionPublicPath, target: KittyItemsMarket.CollectionStoragePath)
+				        }
 				    }
 				}
 		`;
