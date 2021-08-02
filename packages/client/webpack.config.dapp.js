@@ -11,7 +11,7 @@ module.exports = (env, argv) => {
         argv.mode === "development" ? "dist/dapp" : "prod/dapp"
       ),
       filename: "bundle.js",
-      publicPath: "/"
+      publicPath: "/client"
     },
     module: {
       rules: [

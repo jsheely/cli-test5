@@ -11,8 +11,8 @@ enum View {
 }
 
 const viewLinks = {
-  [View.Client]: 'http://localhost:5001',
-  [View.Server]: 'http://localhost:5002/api',
+  [View.Client]: '/client',
+  [View.Server]: '/api',
   [View.Connector]: '',
   [View.Contract]: '',
   [View.Logs]: '',
