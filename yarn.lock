@@ -1285,8 +1285,9 @@
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-10.1.0.tgz#f0950bba18819512d42f7197e56c518aa491cf18"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@decentology/dappstarter-cli-download@../../dappstarter-download":
+"@decentology/dappstarter-cli-download@https://github.com/decentology/dappstarter-cli-download":
   version "1.0.0"
+  resolved "https://github.com/decentology/dappstarter-cli-download#60a02335431ab406ebae49ded1f287087f3c9523"
 
 "@eslint/eslintrc@^0.4.3":
   version "0.4.3"
